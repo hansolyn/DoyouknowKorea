@@ -646,20 +646,30 @@ function drawCard(){
   var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
   S.regs.forEach(function(i){var b=R[i].b;x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3])});
   var whole=S.st.k==="all";
-  if(whole){x0=MAP.mlb[0];y0=MAP.mlb[1];x1=MAP.mlb[2];y1=MAP.mlb[3]}
+  var extra=[];
+  if(whole){
+    x0=MAP.mlb[0];y0=MAP.mlb[1];x1=MAP.mlb[2];y1=MAP.mlb[3];
+    R.forEach(function(q){
+      if(q.s!=="제주"&&q.n!=="울릉")return;
+      extra.push(q.d.slice(0,q.d.indexOf("Z")+1));
+      x0=Math.min(x0,q.b[0]);y0=Math.min(y0,q.b[1]);x1=Math.max(x1,q.b[2]);y1=Math.max(y1,q.b[3]);
+    });
+    x1=Math.max(x1,MAP.dk[0]+6);y1=Math.max(y1,MAP.dk[1]+6);
+  }
   else if(S.inStage[ULL]){x1=Math.max(x1,MAP.dk[0]+8);y1=Math.max(y1,MAP.dk[1]+6)}
-  var bx=90,by=190,bw=W-180,bh=700,s=Math.min(bw/(x1-x0),bh/(y1-y0));
+  var bx=whole?400:90,by=190,bw=whole?600:W-180,bh=whole?660:700,s=Math.min(bw/(x1-x0),bh/(y1-y0));
   var tx=bx+(bw-(x1-x0)*s)*(whole?1:0.5)-x0*s,ty=by+(bh-(y1-y0)*s)/2-y0*s;
-  var ps=whole?[new Path2D(MAP.ml)]:S.regs.map(function(i){return new Path2D(R[i].d)});
+  var ps=whole?[MAP.ml].concat(extra).map(function(d){return new Path2D(d)}):S.regs.map(function(i){return new Path2D(R[i].d)});
   c.save();c.beginPath();c.rect(40,170,W-80,740);c.clip();
   c.setTransform(s,0,0,s,tx,ty);c.lineJoin="round";
   c.strokeStyle=BLUE;c.lineWidth=14/s;ps.forEach(function(p){c.stroke(p)});
   c.fillStyle=BG;c.strokeStyle=BG;c.lineWidth=2/s;ps.forEach(function(p){c.fill(p);c.stroke(p)});
+  if(whole){c.beginPath();c.arc(MAP.dk[0],MAP.dk[1],7/s,0,Math.PI*2);c.fillStyle=BLUE;c.fill()}
   c.restore();
   // score over the outline, bottom-left
-  var num=String(r.p);c.font="400 250px "+disp;var nw=c.measureText(num).width;
+  var num=String(r.p);c.font="400 "+(whole?210:250)+"px "+disp;var nw=c.measureText(num).width;
   c.lineJoin="round";c.strokeStyle=BG;c.lineWidth=26;c.strokeText(num,84,900);c.fillStyle=INK;c.fillText(num,84,900);
-  c.font="400 96px "+disp;c.strokeText("점",96+nw,900);c.fillText("점",96+nw,900);
+  c.font="400 "+(whole?80:96)+"px "+disp;c.strokeText("점",96+nw,900);c.fillText("점",96+nw,900);
   var line=S.st.n+(S.easy?" (쉬움)":"")+(r.rank?" · 상위 "+r.rank+"%":"");
   c.font="600 62px "+body;c.fillStyle=INK;c.fillText(line,90,1030);
   c.strokeStyle="#c9d6e0";c.lineWidth=3;c.beginPath();c.moveTo(90,1085);c.lineTo(W-90,1085);c.stroke();

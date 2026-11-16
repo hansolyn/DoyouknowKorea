@@ -150,6 +150,7 @@ button:focus-visible,label:focus-within,.chip:focus-visible{outline:2px solid va
 .wrong button{width:100%;text-align:left;border:0;background:var(--panel);border-radius:6px;padding:6px 10px}
 .wrong s{color:var(--bad)}
 .note{font-size:12px;color:var(--muted)}
+img.card{width:100%;max-width:300px;aspect-ratio:4/5;margin:0 auto;display:block;border-radius:10px;background:var(--panel)}
 textarea#copybox{width:100%;height:70px;font:inherit;font-size:13px}
 </style>
 </head>
@@ -253,7 +254,7 @@ function renderHome(){
     b.appendChild(el("span",{class:"cnt"},stageRegions(st.k).length+"구역"));
     b.appendChild(el("small",null,st.d));
     var best=store("pn-best-"+st.k);
-    if(best)b.appendChild(el("span",{class:"best"},"내 최고 "+best.p+"점 · "+fmtTime(best.t)));
+    if(best)b.appendChild(el("span",{class:"best"},"내 최고기록 "+best.p+"점, "+fmtTime(best.t)));
     b.addEventListener("click",function(){start(st)});
     box.appendChild(b);
   });
@@ -632,19 +633,74 @@ function shareText(){
   return "대한민국 지명 맞추기 · "+S.st.n+(S.easy?"(쉬움)":"")+" · "+r.p+"점"+(r.rank?" (예상 상위 "+r.rank+"%)":"")+
     " · 정답 "+r.correct+"/"+r.scorable+" · "+fmtTime(S.secs)+" · 힌트 "+S.hints+"회";
 }
+var SITE="https://doyouknowkorea-geo.vercel.app/";
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()}
+function drawCard(){
+  var r=S.result,W=1080,H=1350,cv=document.createElement("canvas");cv.width=W;cv.height=H;
+  var c=cv.getContext("2d"),INK="#17304a",MUT="#5d7388",BLUE="#1f6fb5",BG="#ffffff";
+  var body='"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif',disp='"Do Hyeon",'+body;
+  c.fillStyle="#dfeaf0";c.fillRect(0,0,W,H);
+  rr(c,30,30,W-60,H-60,48);c.fillStyle=BG;c.fill();c.lineWidth=3;c.strokeStyle="#9db3c4";c.stroke();
+  c.textBaseline="alphabetic";c.fillStyle=MUT;c.font="500 44px "+body;c.fillText("대한민국 지명 맞추기",90,140);
+  // stage outline: thick stroke, then cover the inside so only the outer edge remains
+  var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  S.regs.forEach(function(i){var b=R[i].b;x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3])});
+  if(S.inStage[ULL]){x1=Math.max(x1,MAP.dk[0]+8);y1=Math.max(y1,MAP.dk[1]+6)}
+  var bx=90,by=190,bw=W-180,bh=700,s=Math.min(bw/(x1-x0),bh/(y1-y0));
+  var tx=bx+(bw-(x1-x0)*s)/2-x0*s,ty=by+(bh-(y1-y0)*s)/2-y0*s;
+  var ps=S.regs.map(function(i){return new Path2D(R[i].d)});
+  c.save();c.beginPath();c.rect(40,170,W-80,740);c.clip();
+  c.setTransform(s,0,0,s,tx,ty);c.lineJoin="round";
+  c.strokeStyle=BLUE;c.lineWidth=14/s;ps.forEach(function(p){c.stroke(p)});
+  c.fillStyle=BG;c.strokeStyle=BG;c.lineWidth=2/s;ps.forEach(function(p){c.fill(p);c.stroke(p)});
+  c.restore();
+  // score over the outline, bottom-left
+  var num=String(r.p);c.font="400 250px "+disp;var nw=c.measureText(num).width;
+  c.lineJoin="round";c.strokeStyle=BG;c.lineWidth=26;c.strokeText(num,84,900);c.fillStyle=INK;c.fillText(num,84,900);
+  c.font="400 96px "+disp;c.strokeText("점",96+nw,900);c.fillText("점",96+nw,900);
+  var line=S.st.n+(S.easy?" (쉬움)":"")+(r.rank?" · 상위 "+r.rank+"%":"");
+  c.font="600 62px "+body;c.fillStyle=INK;c.fillText(line,90,1030);
+  c.strokeStyle="#c9d6e0";c.lineWidth=3;c.beginPath();c.moveTo(90,1085);c.lineTo(W-90,1085);c.stroke();
+  c.font="500 50px "+body;c.fillStyle=MUT;
+  var a="정답 "+r.correct+"/"+r.scorable;c.fillText(a,90,1175);c.fillText(fmtTime(S.secs),90+c.measureText(a).width+56,1175);
+  return cv;
+}
+function fontsReady(){
+  try{return Promise.race([Promise.all([document.fonts.load('400 100px "Do Hyeon"',"86점"),document.fonts.load('600 60px "IBM Plex Sans KR"',"강원 정답")]),new Promise(function(ok){setTimeout(ok,1500)})]).catch(function(){})}
+  catch(e){return Promise.resolve()}
+}
+function shareResult(m,row){
+  var text=shareText()+"\n"+SITE,file=S.cardFile;
+  var copyLink=function(msg){
+    var fb=function(){var ta=$("copybox")||el("textarea",{id:"copybox",readonly:""});ta.value=text;m.insertBefore(ta,row);ta.select();toast("아래 문구를 복사해 공유하세요.")};
+    try{navigator.clipboard.writeText(text).then(function(){toast(msg)},fb)}catch(e){fb()}
+  };
+  try{
+    if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
+      navigator.share({files:[file],title:"대한민국 지명 맞추기",text:text}).catch(function(e){if(e&&e.name!=="AbortError")copyLink("링크와 문구를 복사했습니다.")});
+      return;
+    }
+    if(navigator.share&&!file){navigator.share({title:"대한민국 지명 맞추기",text:shareText(),url:SITE}).catch(function(){});return}
+  }catch(e){}
+  if(S.cardUrl){try{var a=el("a",{href:S.cardUrl,download:"korea-quiz-"+S.st.k+".png"});document.body.appendChild(a);a.click();a.remove()}catch(e){}}
+  copyLink("이미지를 저장하고 링크를 복사했습니다.");
+}
 function showResult(){
   var r=S.result;
   modal(function(m){
-    m.appendChild(el("h2",null,S.st.n+" 결과"));
-    var sc=el("div",{class:"score"});sc.appendChild(el("b",null,r.p+"점"));
-    if(r.rank)sc.appendChild(el("span",{class:"rank"},"예상 상위 "+r.rank+"%"));
-    else if(S.easy)sc.appendChild(el("span",{class:"note"},"쉬움 모드는 순위에서 빠집니다."));
-    else sc.appendChild(el("span",{class:"note"},"한 번 더 하면 훨씬 잘 보일 거예요."));
-    m.appendChild(sc);
-    var dl=el("dl",{class:"facts"});
-    [["정답",r.correct+"/"+r.scorable],["시간",fmtTime(S.secs)],["힌트",S.hints+"회 (−"+S.penalty+")"]].forEach(function(f){
-      var d=el("div");d.appendChild(el("dt",null,f[0]));d.appendChild(el("dd",null,f[1]));dl.appendChild(d)});
-    m.appendChild(dl);
+    var img=el("img",{class:"card",alt:S.st.n+" 결과 "+r.p+"점, 정답 "+r.correct+"/"+r.scorable+", "+fmtTime(S.secs)});
+    m.appendChild(img);
+    var st=S;
+    fontsReady().then(function(){
+      if(S!==st)return;
+      var cv=drawCard();
+      try{img.src=cv.toDataURL("image/png")}catch(e){}
+      try{cv.toBlob(function(b){if(!b||S!==st)return;if(st.cardUrl)URL.revokeObjectURL(st.cardUrl);st.cardUrl=URL.createObjectURL(b);
+        try{st.cardFile=new File([b],"korea-quiz-"+st.st.k+".png",{type:"image/png"})}catch(e){st.cardFile=null}},"image/png")}catch(e){}
+    });
+    if(S.easy)m.appendChild(el("p",{class:"note"},"쉬움 모드는 순위에서 빠집니다."));
+    else if(!r.rank)m.appendChild(el("p",{class:"note"},"한 번 더 하면 훨씬 잘 보일 거예요."));
+    if(S.hints)m.appendChild(el("p",{class:"note"},"힌트 "+S.hints+"회 사용 (−"+S.penalty+"점)"));
     var wrong=S.regs.filter(function(i){return r.map[i]==="bad"});
     if(wrong.length){
       m.appendChild(el("p",{class:"note"},"틀린 곳 "+wrong.length+"개 · 누르면 지도에서 보여줍니다"));
@@ -659,12 +715,8 @@ function showResult(){
     }
     if(r.rank)m.appendChild(el("p",{class:"note"},"상위 %는 기준표로 계산한 예상값입니다. 플레이 기록이 스테이지당 100건 쌓이면 실제 순위로 바뀝니다."));
     var row=el("div",{class:"row"});
-    var cp=el("button",{class:"btn",type:"button"},"결과 복사");
-    cp.addEventListener("click",function(){
-      var txt=shareText();
-      var fb=function(){var ta=$("copybox")||el("textarea",{id:"copybox",readonly:""});ta.value=txt;m.insertBefore(ta,row);ta.select()};
-      try{navigator.clipboard.writeText(txt).then(function(){toast("복사했습니다.")},fb)}catch(e){fb()}
-    });
+    var cp=el("button",{class:"btn",type:"button"},"결과 공유하기");
+    cp.addEventListener("click",function(){shareResult(m,row)});
     var mp=el("button",{class:"btn",type:"button"},"지도 보기");mp.addEventListener("click",closeModal);
     var ag=el("button",{class:"btn primary",type:"button"},"다시 하기");ag.addEventListener("click",function(){closeModal();start(S.st)});
     row.appendChild(cp);row.appendChild(mp);row.appendChild(ag);m.appendChild(row);

@@ -678,8 +678,22 @@ function drawCard(){
   return cv;
 }
 function fontsReady(){
-  try{return Promise.race([Promise.all([document.fonts.load('400 100px "Do Hyeon"',"86점"),document.fonts.load('600 60px "IBM Plex Sans KR"',"강원 정답")]),new Promise(function(ok){setTimeout(ok,1500)})]).catch(function(){})}
-  catch(e){return Promise.resolve()}
+  // 한글 웹폰트는 글자 묶음별로 나뉘어 있어서, 카드에 실제로 그릴 글자를 굵기별로 미리 불러와야 섞이지 않는다
+  var r=S.result,body='"IBM Plex Sans KR"';
+  var line=S.st.n+(S.easy?" (쉬움)":"")+(r.rank?" · 상위 "+r.rank+"%":"");
+  var stats="정답 "+r.correct+"/"+r.scorable+" "+fmtTime(S.secs);
+  var jobs=[
+    ['500 44px '+body,"대한민국 지명 맞추기"],
+    ['500 50px '+body,stats],
+    ['600 62px '+body,line],
+    ['400 100px "Do Hyeon"',String(r.p)+"점"]
+  ];
+  try{
+    return Promise.race([
+      Promise.all(jobs.map(function(j){return document.fonts.load(j[0],j[1]).catch(function(){})})),
+      new Promise(function(ok){setTimeout(ok,4000)})
+    ]).catch(function(){});
+  }catch(e){return Promise.resolve()}
 }
 function shareResult(m,row){
   var text=SITE,file=S.cardFile;

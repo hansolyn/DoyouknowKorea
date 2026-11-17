@@ -179,6 +179,7 @@ textarea#copybox{width:100%;height:70px;font:inherit;font-size:13px}
       <li>채점 전까지는 얼마든지 옮길 수 있고, 더블탭으로 뺄 수 있습니다. 다 못 채워도 채점 됩니다.</li>
       <li>맞은 구역마다 10점. 힌트를 쓰면 감점됩니다.</li>
     </ol>
+    <p class="src">상위 % 집계를 위해 채점 결과(스테이지, 점수, 소요 시간, 힌트 횟수)가 익명으로 전송됩니다. 이름·계정 등 개인 정보는 수집하지 않습니다. 쉬움 모드는 전송하지 않습니다.</p>
     <p class="src">경계 데이터: <a href="https://github.com/vuski/admdongkor">vuski/admdongkor</a> 2026년 10월판(MIT)을 시·군 단위로 합쳐 단순화. 광역시는 1구역, 광주와 전남은 통합 전 기준으로 분리.</p>
     <footer class="foot">© 2026. KIMHANSOL All rights reserved.</footer>
   </div>
@@ -245,9 +246,26 @@ var toastT;function toast(m){var t=$("toast");t.textContent=m;t.classList.add("o
 function store(k,v){try{if(v===undefined){var s=localStorage.getItem(k);return s?JSON.parse(s):null}localStorage.setItem(k,JSON.stringify(v))}catch(e){return null}}
 function modal(build){var m=$("modal");m.innerHTML="";build(m);$("veil").hidden=false;var b=m.querySelector("button");if(b)b.focus()}
 function closeModal(){$("veil").hidden=true}
-/* 점수 수집 자리: 외부 배포 시 이 함수에서 서버로 익명 점수를 보낸다.
-   스테이지당 100건이 쌓이면 percentile() 대신 실제 분포로 상위 %를 계산한다. */
-function reportScore(rec){ /* no-op in this build */ }
+/* 익명 점수 수집: 스테이지·점수·시간·힌트 수만 /api/score 로 보낸다(이름·계정 없음).
+   스테이지당 REAL_MIN건 이상 쌓이면 기준표 대신 실제 분포로 상위 %를 계산한다.
+   서버가 없거나 실패하면 null → 기준표를 그대로 쓴다. */
+var REAL_MIN=100;
+function reportScore(rec){
+  return new Promise(function(done){
+    var fin=false;function end(v){if(!fin){fin=true;done(v)}}
+    setTimeout(function(){end(null)},2500);
+    try{
+      fetch("/api/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(rec)})
+        .then(function(r){return r.ok?r.json():null})
+        .then(function(j){end(j&&j.ok&&j.total>0?j:null)})
+        .catch(function(){end(null)});
+    }catch(e){end(null)}
+  });
+}
+function realRank(j){
+  var pct=Math.ceil((j.better+1)/j.total*100);
+  return pct<=50?Math.max(1,pct):null;
+}
 
 /* ---------- home ---------- */
 function stageRegions(k){var a=[];for(var i=0;i<R.length;i++)if(k==="all"||R[i].g===k)a.push(i);return a}
@@ -650,12 +668,16 @@ function grade(){
   S.result=r;S.graded=true;S.sel=null;S.selReg=null;S.cand=null;
   r.rank=S.easy?null:percentile(r.p);
   $("bGrade").hidden=true;$("bCheck").hidden=true;$("bResult").hidden=false;
-  if(!S.easy){
-    var best=store("pn-best-"+S.st.k);
-    if(!best||r.p>best.p||(r.p===best.p&&S.secs<best.t))store("pn-best-"+S.st.k,{p:r.p,t:S.secs});
-    reportScore({stage:S.st.k,p:r.p,hints:S.hints,secs:S.secs});
-  }
-  renderTray();renderSel();paint();showResult();
+  renderTray();renderSel();paint();
+  if(S.easy){showResult();return}
+  var best=store("pn-best-"+S.st.k);
+  if(!best||r.p>best.p||(r.p===best.p&&S.secs<best.t))store("pn-best-"+S.st.k,{p:r.p,t:S.secs});
+  var st=S;
+  reportScore({stage:S.st.k,c:r.correct,n:r.scorable,pen:S.penalty,hints:S.hints,secs:S.secs}).then(function(j){
+    if(S!==st)return;
+    if(j&&j.total>=REAL_MIN){r.rank=realRank(j);r.real=j.total}
+    showResult();
+  });
 }
 function shareText(){
   var r=S.result;
@@ -768,7 +790,8 @@ function showResult(){
       });
       m.appendChild(ul);
     }
-    if(r.rank)m.appendChild(el("p",{class:"note"},"상위 %는 기준표로 계산한 예상값입니다. 플레이 기록이 스테이지당 100건 쌓이면 실제 순위로 바뀝니다."));
+    if(r.real)m.appendChild(el("p",{class:"note"},"상위 %는 이 스테이지의 플레이 기록 "+r.real.toLocaleString("ko-KR")+"건 기준입니다."));
+    else if(r.rank)m.appendChild(el("p",{class:"note"},"상위 %는 기준표로 계산한 예상값입니다. 플레이 기록이 스테이지당 100건 쌓이면 실제 순위로 바뀝니다."));
     var row=el("div",{class:"row"});
     var cp=el("button",{class:"btn",type:"button"},"결과 공유하기");
     cp.addEventListener("click",function(){shareResult(m,row)});

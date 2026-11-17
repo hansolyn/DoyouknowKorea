@@ -745,20 +745,29 @@ function fontsReady(){
     ]).catch(function(){});
   }catch(e){return Promise.resolve()}
 }
+function saveImage(quiet){
+  var name="korea-quiz-"+S.st.k+".png",href=S.cardUrl;
+  if(!href){var im=$("modal").querySelector("img.card");href=im&&im.src}
+  if(!href){toast("이미지를 만드는 중입니다. 잠시 후 다시 눌러주세요.");return false}
+  try{var a=el("a",{href:href,download:name});document.body.appendChild(a);a.click();a.remove()}catch(e){toast("저장이 안 되면 이미지를 길게 누르거나 우클릭해 저장하세요.");return false}
+  if(!quiet)toast("이미지를 저장했습니다. 저장이 안 되면 이미지를 길게 누르거나 우클릭해 저장하세요.");
+  return true;
+}
 function shareResult(m,row){
   var text=SITE,file=S.cardFile;
   var copyLink=function(msg){
     var fb=function(){var ta=$("copybox")||el("textarea",{id:"copybox",readonly:""});ta.value=text;m.insertBefore(ta,row);ta.select();toast("아래 링크를 복사해 공유하세요.")};
     try{navigator.clipboard.writeText(text).then(function(){toast(msg)},fb)}catch(e){fb()}
   };
-  try{
+  var desktop=false;try{desktop=matchMedia("(hover:hover) and (pointer:fine)").matches&&!navigator.maxTouchPoints}catch(e){}
+  if(!desktop)try{
     if(file&&navigator.canShare&&navigator.canShare({files:[file]})){
-      navigator.share({files:[file],text:text}).catch(function(e){if(e&&e.name!=="AbortError")copyLink("링크를 복사했습니다.")});
+      navigator.share({files:[file],text:text}).catch(function(e){if(e&&e.name!=="AbortError"){saveImage(true);copyLink("이미지를 저장하고 링크를 복사했습니다.")}});
       return;
     }
     if(navigator.share&&!file){navigator.share({text:text}).catch(function(){});return}
   }catch(e){}
-  if(S.cardUrl){try{var a=el("a",{href:S.cardUrl,download:"korea-quiz-"+S.st.k+".png"});document.body.appendChild(a);a.click();a.remove()}catch(e){}}
+  saveImage(true);
   copyLink("이미지를 저장하고 링크를 복사했습니다.");
 }
 function showResult(){
@@ -792,9 +801,10 @@ function showResult(){
     var row=el("div",{class:"row"});
     var cp=el("button",{class:"btn",type:"button"},"결과 공유하기");
     cp.addEventListener("click",function(){shareResult(m,row)});
+    var sv2=el("button",{class:"btn",type:"button"},"이미지 저장");sv2.addEventListener("click",function(){saveImage()});
     var mp=el("button",{class:"btn",type:"button"},"지도 보기");mp.addEventListener("click",closeModal);
     var ag=el("button",{class:"btn primary",type:"button"},"다시 하기");ag.addEventListener("click",function(){closeModal();start(S.st)});
-    row.appendChild(cp);row.appendChild(mp);row.appendChild(ag);m.appendChild(row);
+    row.appendChild(cp);row.appendChild(sv2);row.appendChild(mp);row.appendChild(ag);m.appendChild(row);
   });
 }
 function focusRegion(i){

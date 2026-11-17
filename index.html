@@ -789,7 +789,6 @@ function showResult(){
       });
       m.appendChild(ul);
     }
-    if(r.rank&&!r.real)m.appendChild(el("p",{class:"note"},"상위 %는 기준표로 계산한 예상값입니다. 플레이 기록이 스테이지당 100건 쌓이면 실제 순위로 바뀝니다."));
     var row=el("div",{class:"row"});
     var cp=el("button",{class:"btn",type:"button"},"결과 공유하기");
     cp.addEventListener("click",function(){shareResult(m,row)});
